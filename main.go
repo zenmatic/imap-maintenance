@@ -2,12 +2,79 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-imap"
+	"github.com/Sirupsen/logrus"
+	"github.com/urfave/cli"
 )
 
+var VERSION = "0.1"
+
 func main() {
+	if err := mainErr(); err != nil {
+		logrus.Fatal(err)
+	}
+}
+
+func mainErr() error {
+	app := cli.NewApp()
+	app.Name = "imap-maintenance"
+	app.Usage = "Rancher CLI, managing containers one UTF-8 character at a time"
+	app.Before = func(ctx *cli.Context) error {
+		if ctx.GlobalBool("debug") {
+			logrus.SetLevel(logrus.DebugLevel)
+		}
+		return nil
+	}
+	app.Version = VERSION
+	app.Author = ""
+	app.Email = ""
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:  "debug",
+			Usage: "Debug logging",
+		},
+		cli.BoolFlag{
+			Name:  "dry-run",
+			Usage: "Dry run mode",
+		},
+		cli.StringFlag{
+			Name:  "server",
+			Usage: "imap server",
+		},
+		cli.StringFlag{
+			Name:  "user",
+			Usage: "imap user",
+		},
+	}
+	app.Commands = []cli.Command{
+		cli.Command{
+			Name:        "purge",
+			Usage:       "purge folders",
+			Description: "\npurge IMAP folders based on age",
+			ArgsUsage:   "None",
+			Action:      purgeFolders,
+			Flags:       []cli.Flag{
+				cli.StringFlag{
+					Name:  "folders",
+					Usage: "folders to purge",
+				},
+				cli.StringFlag{
+					Name:  "age",
+					Usage: "older than AGE (in days)",
+				},
+			},
+		},
+	}
+	// future command: sort by year
+	// future command: move old user dirs
+	return app.Run(os.Args)
+}
+
+func purgeFolders(ctx *cli.Context) error {
+
 	log.Println("Connecting to server...")
 
 	// Connect to server
@@ -75,4 +142,5 @@ func main() {
 	}
 
 	log.Println("Done!")
+	return nil
 }
