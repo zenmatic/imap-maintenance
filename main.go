@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -89,11 +88,9 @@ func mainErr() error {
 }
 
 func promptPassword() (password string, err error) {
-	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("Password: ")
-	scanner.Scan()
-	password = scanner.Text()
-	err = scanner.Err()
+	bytes, err := terminal.ReadPassword(0)
+	password = string(bytes)
 	return
 }
 
