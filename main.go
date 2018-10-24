@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-imap"
 	"github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var VERSION = "0.1"
@@ -33,19 +37,24 @@ func mainErr() error {
 	app.Email = ""
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
-			Name:  "debug",
+			Name:  "debug, d",
 			Usage: "Debug logging",
 		},
 		cli.BoolFlag{
-			Name:  "dry-run",
+			Name:  "dry-run, n",
 			Usage: "Dry run mode",
 		},
 		cli.StringFlag{
-			Name:  "server",
+			Name:  "server, s",
 			Usage: "imap server",
 		},
+		cli.IntFlag{
+			Name:  "port, P",
+			Value: 993,
+			Usage: "imap server port",
+		},
 		cli.StringFlag{
-			Name:  "user",
+			Name:  "user, u",
 			Usage: "imap user",
 		},
 	}
@@ -58,12 +67,18 @@ func mainErr() error {
 			Action:      purgeFolders,
 			Flags:       []cli.Flag{
 				cli.StringFlag{
-					Name:  "folders",
+					Name:  "folders, F",
 					Usage: "folders to purge",
 				},
-				cli.StringFlag{
-					Name:  "age",
+				cli.IntFlag{
+					Name:  "age, A",
+					Value: 400,
 					Usage: "older than AGE (in days)",
+				},
+				cli.IntFlag{
+					Name:  "batch, B",
+					Value: 25,
+					Usage: "purge in batches",
 				},
 			},
 		},
@@ -73,12 +88,29 @@ func mainErr() error {
 	return app.Run(os.Args)
 }
 
+func promptPassword() (password string, err error) {
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Print("Password: ")
+	scanner.Scan()
+	password = scanner.Text()
+	err = scanner.Err()
+	return
+}
+
 func purgeFolders(ctx *cli.Context) error {
+	imapServer := ctx.GlobalString("server")
+	imapPort := ctx.GlobalInt("port")
+	imapUser := ctx.GlobalString("user")
+	imapPass, err := promptPassword()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	log.Println("Connecting to server...")
 
 	// Connect to server
-	c, err := client.DialTLS("mail.example.org:993", nil)
+	fullServer := imapServer + ":" + strconv.Itoa(imapPort)
+	c, err := client.DialTLS(fullServer, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -88,7 +120,7 @@ func purgeFolders(ctx *cli.Context) error {
 	defer c.Logout()
 
 	// Login
-	if err := c.Login("username", "password"); err != nil {
+	if err := c.Login(imapUser, imapPass); err != nil {
 		log.Fatal(err)
 	}
 	log.Println("Logged in")
