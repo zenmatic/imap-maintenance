@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 
@@ -100,27 +99,27 @@ func purgeFolders(ctx *cli.Context) error {
 	imapUser := ctx.GlobalString("user")
 	imapPass, err := promptPassword()
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 
-	log.Println("Connecting to server...")
+	logrus.Info("Connecting to server...")
 
 	// Connect to server
 	fullServer := imapServer + ":" + strconv.Itoa(imapPort)
 	c, err := client.DialTLS(fullServer, nil)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
-	log.Println("Connected")
+	logrus.Info("Connected")
 
 	// Don't forget to logout
 	defer c.Logout()
 
 	// Login
 	if err := c.Login(imapUser, imapPass); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
-	log.Println("Logged in")
+	logrus.Info("Logged in")
 
 	// List mailboxes
 	mailboxes := make(chan *imap.MailboxInfo, 10)
@@ -129,21 +128,21 @@ func purgeFolders(ctx *cli.Context) error {
 		done <- c.List("", "*", mailboxes)
 	}()
 
-	log.Println("Mailboxes:")
+	logrus.Info("Mailboxes:")
 	for m := range mailboxes {
-		log.Println("* " + m.Name)
+		logrus.Info("* " + m.Name)
 	}
 
 	if err := <-done; err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 
 	// Select INBOX
 	mbox, err := c.Select("INBOX", false)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
-	log.Println("Flags for INBOX:", mbox.Flags)
+	logrus.Info("Flags for INBOX:", mbox.Flags)
 
 	// Get the last 4 messages
 	from := uint32(1)
@@ -161,15 +160,15 @@ func purgeFolders(ctx *cli.Context) error {
 		done <- c.Fetch(seqset, []imap.FetchItem{imap.FetchEnvelope}, messages)
 	}()
 
-	log.Println("Last 4 messages:")
+	logrus.Info("Last 4 messages:")
 	for msg := range messages {
-		log.Println("* " + msg.Envelope.Subject)
+		logrus.Info("* " + msg.Envelope.Subject)
 	}
 
 	if err := <-done; err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 
-	log.Println("Done!")
+	logrus.Info("Done!")
 	return nil
 }
