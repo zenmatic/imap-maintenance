@@ -64,10 +64,6 @@ func mainErr() error {
 			ArgsUsage:   "None",
 			Action:      purgeFolders,
 			Flags:       []cli.Flag{
-				cli.StringFlag{
-					Name:  "folders, F",
-					Usage: "folders to purge",
-				},
 				cli.IntFlag{
 					Name:  "age, A",
 					Value: 400,
@@ -101,6 +97,13 @@ func purgeFolders(ctx *cli.Context) error {
 	if err != nil {
 		logrus.Fatal(err)
 	}
+	//msgAge := ctx.Int("age")
+	//batch := ctx.Int("batch")
+	logrus.Debugf("num of args %d", ctx.NArg())
+	if ctx.NArg() < 1 {
+		logrus.Fatal("no folders passed")
+	}
+	folders := ctx.Args()
 
 	logrus.Info("Connecting to server...")
 
@@ -121,33 +124,16 @@ func purgeFolders(ctx *cli.Context) error {
 	}
 	logrus.Info("Logged in")
 
-	// List mailboxes
-	mailboxes := make(chan *imap.MailboxInfo, 10)
-	done := make(chan error, 1)
-	go func () {
-		done <- c.List("", "*", mailboxes)
-	}()
-
-	logrus.Info("Mailboxes:")
-	for m := range mailboxes {
-		logrus.Info("* " + m.Name)
-	}
-
-	if err := <-done; err != nil {
-		logrus.Fatal(err)
-	}
-
-	// Select INBOX
-	mbox, err := c.Select("INBOX", false)
+	folder := folders[0]
+	mbox, err := c.Select(folder, false)
 	if err != nil {
 		logrus.Fatal(err)
 	}
-	logrus.Info("Flags for INBOX:", mbox.Flags)
+	logrus.Infof("Flags for %s: %v", folder, mbox.Flags)
 
-	// Get the last 4 messages
 	from := uint32(1)
 	to := mbox.Messages
-	if mbox.Messages > 3 {
+	if mbox.Messages > 0 {
 		// We're using unsigned integers here, only substract if the result is > 0
 		from = mbox.Messages - 3
 	}
@@ -155,7 +141,7 @@ func purgeFolders(ctx *cli.Context) error {
 	seqset.AddRange(from, to)
 
 	messages := make(chan *imap.Message, 10)
-	done = make(chan error, 1)
+	done := make(chan error, 1)
 	go func() {
 		done <- c.Fetch(seqset, []imap.FetchItem{imap.FetchEnvelope}, messages)
 	}()
