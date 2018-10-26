@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-imap"
@@ -64,7 +65,7 @@ func mainErr() error {
 			ArgsUsage:   "None",
 			Action:      purgeFolders,
 			Flags:       []cli.Flag{
-				cli.IntFlag{
+				cli.Int64Flag{
 					Name:  "age, A",
 					Value: 400,
 					Usage: "older than AGE (in days)",
@@ -97,7 +98,7 @@ func purgeFolders(ctx *cli.Context) error {
 	if err != nil {
 		logrus.Fatal(err)
 	}
-	//msgAge := ctx.Int("age")
+	msgAge := ctx.Int64("age")
 	//batch := ctx.Int("batch")
 	logrus.Debugf("num of args %d", ctx.NArg())
 	if ctx.NArg() < 1 {
@@ -131,15 +132,19 @@ func purgeFolders(ctx *cli.Context) error {
 	}
 	logrus.Infof("Flags for %s: %v", folder, mbox.Flags)
 
-	from := uint32(1)
-	to := mbox.Messages
-	if mbox.Messages > 0 {
-		// We're using unsigned integers here, only substract if the result is > 0
-		from = mbox.Messages - 3
+	t := time.Now()
+	var day int64
+	day = 60*60*24
+	beforeTime := t.Unix() - (day*msgAge)
+	before := time.Unix(beforeTime, 0)
+	searchCrit := new(imap.SearchCriteria)
+	searchCrit.Before = before
+	seqNums, err := c.Search(searchCrit)
+	if err != nil {
+		logrus.Fatal(err)
 	}
-	seqset := new(imap.SeqSet)
-	seqset.AddRange(from, to)
-
+	logrus.Debug("%v", seqNums)
+	/*
 	messages := make(chan *imap.Message, 10)
 	done := make(chan error, 1)
 	go func() {
@@ -154,6 +159,7 @@ func purgeFolders(ctx *cli.Context) error {
 	if err := <-done; err != nil {
 		logrus.Fatal(err)
 	}
+	*/
 
 	logrus.Info("Done!")
 	return nil
