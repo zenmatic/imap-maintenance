@@ -144,22 +144,25 @@ func purgeFolders(ctx *cli.Context) error {
 		logrus.Fatal(err)
 	}
 	logrus.Debug("%v", seqNums)
-	/*
+	for num, _ := range seqNums {
+		logrus.Debugf("seqnum: %v", num)
+	}
+	seqset := new(imap.SeqSet)
+	seqset.AddNum(seqNums...)
+
 	messages := make(chan *imap.Message, 10)
 	done := make(chan error, 1)
 	go func() {
 		done <- c.Fetch(seqset, []imap.FetchItem{imap.FetchEnvelope}, messages)
 	}()
 
-	logrus.Info("Last 4 messages:")
 	for msg := range messages {
-		logrus.Info("* " + msg.Envelope.Subject)
+		logrus.Infof("* %v %v", msg.Envelope.Date, msg.Envelope.Subject)
 	}
 
 	if err := <-done; err != nil {
 		logrus.Fatal(err)
 	}
-	*/
 
 	logrus.Info("Done!")
 	return nil
