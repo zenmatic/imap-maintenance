@@ -99,7 +99,7 @@ func purgeFolders(ctx *cli.Context) error {
 		logrus.Fatal(err)
 	}
 	msgAge := ctx.Int64("age")
-	//batch := ctx.Int("batch")
+	batch := ctx.Int("batch")
 	logrus.Debugf("num of args %d", ctx.NArg())
 	if ctx.NArg() < 1 {
 		logrus.Fatal("no folders passed")
@@ -148,7 +148,8 @@ func purgeFolders(ctx *cli.Context) error {
 		logrus.Debugf("seqnum: %v", num)
 	}
 	seqset := new(imap.SeqSet)
-	seqset.AddNum(seqNums...)
+	//seqset.AddNum(seqNums...)
+	seqset.AddNum(seqNums[0:10]...)
 
 	messages := make(chan *imap.Message, 10)
 	done := make(chan error, 1)
@@ -156,11 +157,22 @@ func purgeFolders(ctx *cli.Context) error {
 		done <- c.Fetch(seqset, []imap.FetchItem{imap.FetchEnvelope}, messages)
 	}()
 
+	//logrus.Infof("found %d messages", len(messages))
 	for msg := range messages {
 		logrus.Infof("* %v %v", msg.Envelope.Date, msg.Envelope.Subject)
 	}
 
 	if err := <-done; err != nil {
+		logrus.Fatal(err)
+	}
+
+	item := imap.FormatFlagsOp(imap.AddFlags, true)
+	flags := []interface{}{imap.DeletedFlag}
+	if err := c.Store(seqset, item, flags, nil); err != nil {
+		logrus.Fatal(err)
+	}
+
+	if err := c.Expunge(nil); err != nil {
 		logrus.Fatal(err)
 	}
 
