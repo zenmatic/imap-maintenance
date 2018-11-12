@@ -90,14 +90,33 @@ func promptPassword() (password string, err error) {
 	return
 }
 
-func purgeFolders(ctx *cli.Context) error {
+func connectAndLogin(ctx *cli.Context) (*client.Client, error) {
 	imapServer := ctx.GlobalString("server")
 	imapPort := ctx.GlobalInt("port")
 	imapUser := ctx.GlobalString("user")
 	imapPass, err := promptPassword()
 	if err != nil {
+		return nil, err
+	}
+
+	logrus.Info("Connecting to server...")
+	fullServer := imapServer + ":" + strconv.Itoa(imapPort)
+	c, err := client.DialTLS(fullServer, nil)
+	if err != nil {
 		logrus.Fatal(err)
 	}
+	logrus.Info("Connected")
+
+	logrus.Info("Logging in")
+	if err := c.Login(imapUser, imapPass); err != nil {
+		return c, err
+	}
+	logrus.Info("Logged in")
+
+	return c, err
+}
+
+func purgeFolders(ctx *cli.Context) error {
 	msgAge := ctx.Int64("age")
 	batch := ctx.Int("batch")
 	logrus.Debugf("num of args %d", ctx.NArg())
@@ -106,24 +125,11 @@ func purgeFolders(ctx *cli.Context) error {
 	}
 	folders := ctx.Args()
 
-	logrus.Info("Connecting to server...")
-
-	// Connect to server
-	fullServer := imapServer + ":" + strconv.Itoa(imapPort)
-	c, err := client.DialTLS(fullServer, nil)
+	c, err := connectAndLogin(ctx)
 	if err != nil {
 		logrus.Fatal(err)
 	}
-	logrus.Info("Connected")
-
-	// Don't forget to logout
 	defer c.Logout()
-
-	// Login
-	if err := c.Login(imapUser, imapPass); err != nil {
-		logrus.Fatal(err)
-	}
-	logrus.Info("Logged in")
 
 	folder := folders[0]
 	mbox, err := c.Select(folder, false)
