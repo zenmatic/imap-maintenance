@@ -117,6 +117,9 @@ func connectAndLogin(ctx *cli.Context) (*client.Client, error) {
 }
 
 func purgeFolders(ctx *cli.Context) error {
+	var done chan error
+	var messages chan *imap.Message
+
 	msgAge := ctx.Int64("age")
 	batch := ctx.Int("batch")
 	logrus.Debugf("num of args %d", ctx.NArg())
@@ -131,80 +134,95 @@ func purgeFolders(ctx *cli.Context) error {
 	}
 	defer c.Logout()
 
-	folder := folders[0]
-	mbox, err := c.Select(folder, false)
-	if err != nil {
-		logrus.Fatal(err)
-	}
-	logrus.Infof("Flags for %s: %v", folder, mbox.Flags)
-
-	t := time.Now()
-	var day int64
-	day = 60*60*24
-	beforeTime := t.Unix() - (day*msgAge)
-	before := time.Unix(beforeTime, 0)
-	searchCrit := new(imap.SearchCriteria)
-	searchCrit.Before = before
-	seqNums, err := c.Search(searchCrit)
-	if err != nil {
-		logrus.Fatal(err)
-	}
-	logrus.Debug("%v", seqNums)
-	for num, _ := range seqNums {
-		logrus.Debugf("seqnum: %v", num)
-	}
-
-	var done chan error
-	var messages chan *imap.Message
-	seqset := new(imap.SeqSet)
-	seqLen := len(seqNums)
-	start := 0
-	end := start + batch
-	if seqLen < batch {
-		end = seqLen
-	}
-	ct := 1
-	for start < seqLen {
-		logrus.Infof("batch %v is %v", ct, seqNums[start:end])
-		seqset.Clear()
-		seqset.AddNum(seqNums[start:end]...)
-
-		ct++
-		start = end
-		end = start + batch
-		if end > seqLen {
-			end = seqLen
+	for _, folder := range folders {
+		mbox, err := c.Select(folder, false)
+		if err != nil {
+			logrus.Fatal(err)
 		}
-		messages = make(chan *imap.Message, end-start)
+		logrus.Infof("Flags for %s: %v %-v", folder, mbox.Flags)
+		logrus.Infof("Unread: %d, Total: %d", mbox.Unseen, mbox.Messages)
+
+		lastset := new(imap.SeqSet)
+		//lastset.AddNum(mbox.Messages)
+		lastset.AddNum(1)
+		messages = make(chan *imap.Message, 1)
 		done = make(chan error, 1)
 		go func() {
-			done <- c.Fetch(seqset, []imap.FetchItem{imap.FetchEnvelope}, messages)
+			done <- c.Fetch(lastset, []imap.FetchItem{imap.FetchEnvelope}, messages)
 		}()
-
-		for msg := range messages {
-			logrus.Infof("* %v %v", msg.Envelope.Date, msg.Envelope.Subject)
-		}
-
 		if err := <-done; err != nil {
 			logrus.Fatal(err)
 		}
-		logrus.Infof("batch %v is done", ct)
-
-		item := imap.FormatFlagsOp(imap.AddFlags, true)
-		flags := []interface{}{imap.DeletedFlag}
-		if err := c.Store(seqset, item, flags, nil); err != nil {
-			logrus.Fatal(err)
+		if msg := <-messages; msg != nil {
+			logrus.Infof("Oldest message: %v %v", msg.Envelope.Date, msg.Envelope.Subject)
 		}
 
-		if err := c.Expunge(nil); err != nil {
+		t := time.Now()
+		var day int64
+		day = 60*60*24
+		beforeTime := t.Unix() - (day*msgAge)
+		before := time.Unix(beforeTime, 0)
+		searchCrit := new(imap.SearchCriteria)
+		searchCrit.Before = before
+		seqNums, err := c.Search(searchCrit)
+		if err != nil {
 			logrus.Fatal(err)
 		}
+		logrus.Debug("%v", seqNums)
+		for num, _ := range seqNums {
+			logrus.Debugf("seqnum: %v", num)
+		}
 
-		sleeptime := 30 * 1000 * time.Millisecond
-		logrus.Infof("sleep %d seconds", sleeptime / 1000*time.Millisecond)
-		time.Sleep(sleeptime)
+		seqset := new(imap.SeqSet)
+		seqLen := len(seqNums)
+		start := 0
+		end := start + batch
+		if seqLen < batch {
+			end = seqLen
+		}
+		ct := 1
+		for start < seqLen {
+			logrus.Infof("batch %v is %v", ct, seqNums[start:end])
+			seqset.Clear()
+			seqset.AddNum(seqNums[start:end]...)
+
+			ct++
+			start = end
+			end = start + batch
+			if end > seqLen {
+				end = seqLen
+			}
+			messages = make(chan *imap.Message, end-start)
+			done = make(chan error, 1)
+			go func() {
+				done <- c.Fetch(seqset, []imap.FetchItem{imap.FetchEnvelope}, messages)
+			}()
+
+			for msg := range messages {
+				logrus.Infof("* %v %v", msg.Envelope.Date, msg.Envelope.Subject)
+			}
+
+			if err := <-done; err != nil {
+				logrus.Fatal(err)
+			}
+			logrus.Infof("batch %v is done", ct)
+
+			item := imap.FormatFlagsOp(imap.AddFlags, true)
+			flags := []interface{}{imap.DeletedFlag}
+			if err := c.Store(seqset, item, flags, nil); err != nil {
+				logrus.Fatal(err)
+			}
+
+			if err := c.Expunge(nil); err != nil {
+				logrus.Fatal(err)
+			}
+
+			sleeptime := 30 * 1000 * time.Millisecond
+			logrus.Infof("sleep %d seconds", sleeptime / 1000*time.Millisecond)
+			time.Sleep(sleeptime)
+		}
+		logrus.Infof("Done with %s", folder)
 	}
 
-	logrus.Info("Done!")
 	return nil
 }
