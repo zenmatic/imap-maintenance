@@ -77,6 +77,30 @@ func mainErr() error {
 				},
 			},
 		},
+		cli.Command{
+			Name:        "sort-by-year",
+			Usage:       "put old INBOX messages into year folders",
+			Description: "\nput old INBOX messages into year folders",
+			ArgsUsage:   "None",
+			Action:      sortINBOX,
+			Flags:       []cli.Flag{
+				cli.Int64Flag{
+					Name:  "max, m",
+					Value: 500,
+					Usage: "stop after max operations",
+				},
+				cli.Int64Flag{
+					Name:  "age, A",
+					Value: 730,
+					Usage: "older than AGE (in days)",
+				},
+				cli.IntFlag{
+					Name:  "batch, B",
+					Value: 25,
+					Usage: "move messages in in batches",
+				},
+			},
+		},
 	}
 	// future command: sort by year
 	// future command: move old user dirs
@@ -224,5 +248,16 @@ func purgeFolders(ctx *cli.Context) error {
 		logrus.Infof("Done with %s", folder)
 	}
 
+	return nil
+}
+
+func sortINBOX(ctx *cli.Context) error {
+	/*
+	var done chan error
+	var messages chan *imap.Message
+
+	msgAge := ctx.Int64("age")
+	batch := ctx.Int("batch")
+	*/
 	return nil
 }
