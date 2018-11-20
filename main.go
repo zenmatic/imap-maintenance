@@ -6,8 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-imap"
+	"github.com/emersion/go-imap/client"
+	//"github.com/emersion/go-imap-move"
 	"github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
 	"golang.org/x/crypto/ssh/terminal"
@@ -84,6 +85,11 @@ func mainErr() error {
 			ArgsUsage:   "None",
 			Action:      sortINBOX,
 			Flags:       []cli.Flag{
+				cli.StringFlag{
+					Name:  "inbox",
+					Value: "INBOX",
+					Usage: "inbox to operate on",
+				},
 				cli.Int64Flag{
 					Name:  "max, m",
 					Value: 500,
@@ -102,7 +108,6 @@ func mainErr() error {
 			},
 		},
 	}
-	// future command: sort by year
 	// future command: move old user dirs
 	return app.Run(os.Args)
 }
@@ -256,8 +261,46 @@ func sortINBOX(ctx *cli.Context) error {
 	var done chan error
 	var messages chan *imap.Message
 
-	msgAge := ctx.Int64("age")
 	batch := ctx.Int("batch")
 	*/
+	msgAge := ctx.Int64("age")
+	folder := ctx.String("inbox")
+
+	c, err := connectAndLogin(ctx)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	defer c.Logout()
+
+	t := time.Now()
+	var day int64
+	day = 60*60*24
+	beforeTime := t.Unix() - (day*msgAge)
+	before := time.Unix(beforeTime, 0)
+	searchCrit := new(imap.SearchCriteria)
+	searchCrit.Before = before
+
+	seqSet, err := filterMessages(c, folder, searchCrit)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	logrus.Infof("Found the following %v", seqSet)
+
 	return nil
+}
+
+func filterMessages(c *client.Client, folder string, filter *imap.SearchCriteria) ([]uint32, error) {
+	mbox, err := c.Select(folder, false)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	logrus.Infof("Flags for %s: %v %-v", folder, mbox.Flags)
+	logrus.Infof("Unread: %d, Total: %d", mbox.Unseen, mbox.Messages)
+
+	seqNums, err := c.Search(filter)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	return seqNums, nil
 }
