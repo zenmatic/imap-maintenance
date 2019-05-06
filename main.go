@@ -3,14 +3,14 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"time"
+
+	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-imap"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 var VERSION = "0.1"
@@ -47,14 +47,18 @@ func mainErr() error {
 			Name:  "server, s",
 			Usage: "imap server",
 		},
-		cli.IntFlag{
+		cli.StringFlag{
 			Name:  "port, P",
-			Value: 993,
+			Value: "993",
 			Usage: "imap server port",
 		},
 		cli.StringFlag{
 			Name:  "user, u",
 			Usage: "imap user",
+		},
+		cli.BoolFlag{
+			Name:  "tls",
+			Usage: "connect with TLS",
 		},
 	}
 	app.Commands = []cli.Command{
@@ -90,18 +94,16 @@ func promptPassword() (password string, err error) {
 	return
 }
 
-func connectAndLogin(ctx *cli.Context) (*client.Client, error) {
-	imapServer := ctx.GlobalString("server")
-	imapPort := ctx.GlobalInt("port")
-	imapUser := ctx.GlobalString("user")
-	imapPass, err := promptPassword()
-	if err != nil {
-		return nil, err
-	}
-
+func connectAndLogin(imapServer string, imapPort string, imapUser string, imapPass string, useTls bool) (*client.Client, error) {
 	logrus.Info("Connecting to server...")
-	fullServer := imapServer + ":" + strconv.Itoa(imapPort)
-	c, err := client.DialTLS(fullServer, nil)
+	fullServer := imapServer + ":" + imapPort
+	var err error
+	var c *client.Client
+	if useTls {
+		c, err = client.DialTLS(fullServer, nil)
+	} else {
+		c, err = client.Dial(fullServer)
+	}
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -128,7 +130,15 @@ func purgeFolders(ctx *cli.Context) error {
 	}
 	folders := ctx.Args()
 
-	c, err := connectAndLogin(ctx)
+	imapServer := ctx.GlobalString("server")
+	imapPort := ctx.GlobalString("port")
+	imapUser := ctx.GlobalString("user")
+	imapPass, err := promptPassword()
+	if err != nil {
+		return err
+	}
+
+	c, err := connectAndLogin(imapServer, imapPort, imapUser, imapPass, ctx.GlobalBool("tls"))
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -139,7 +149,7 @@ func purgeFolders(ctx *cli.Context) error {
 		if err != nil {
 			logrus.Fatal(err)
 		}
-		logrus.Infof("Flags for %s: %v %-v", folder, mbox.Flags)
+		logrus.Infof("Flags for %s: %v", folder, mbox.Flags)
 		logrus.Infof("Unread: %d, Total: %d", mbox.Unseen, mbox.Messages)
 
 		lastset := new(imap.SeqSet)
@@ -168,7 +178,7 @@ func purgeFolders(ctx *cli.Context) error {
 		if err != nil {
 			logrus.Fatal(err)
 		}
-		logrus.Debug("%v", seqNums)
+		logrus.Debugf("%v", seqNums)
 		for num, _ := range seqNums {
 			logrus.Debugf("seqnum: %v", num)
 		}
