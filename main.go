@@ -95,17 +95,18 @@ func promptPassword() (password string, err error) {
 }
 
 func connectAndLogin(imapServer string, imapPort string, imapUser string, imapPass string, useTls bool) (*client.Client, error) {
-	logrus.Info("Connecting to server...")
 	fullServer := imapServer + ":" + imapPort
+	logrus.Infof("Connecting to %s", fullServer)
 	var err error
 	var c *client.Client
 	if useTls {
+		logrus.Info("Using TLS...")
 		c, err = client.DialTLS(fullServer, nil)
 	} else {
 		c, err = client.Dial(fullServer)
 	}
 	if err != nil {
-		logrus.Fatal(err)
+		return c, err
 	}
 	logrus.Info("Connected")
 
