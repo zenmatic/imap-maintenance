@@ -24,7 +24,7 @@ func main() {
 func mainErr() error {
 	app := cli.NewApp()
 	app.Name = "imap-maintenance"
-	app.Usage = "Rancher CLI, managing containers one UTF-8 character at a time"
+	app.Usage = "purge or sort IMAP mailboxes"
 	app.Before = func(ctx *cli.Context) error {
 		if ctx.GlobalBool("debug") {
 			logrus.SetLevel(logrus.DebugLevel)
