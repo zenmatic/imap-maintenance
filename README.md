@@ -59,4 +59,4 @@ OPTIONS:
 
 #### example: purge messages older than 90 days
 
-``` ./imap-maintenance.exe purge --server imap.gmail.com --user yourgmailuser --tls purge --age 90 bigmailbox```
+``` ./imap-maintenance.exe --server imap.gmail.com --user yourgmailuser --tls purge --age 90 bigmailbox1 bigmailbox2```
