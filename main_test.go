@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	testcontainers "github.com/testcontainers/testcontainers-go"
@@ -11,7 +12,20 @@ import (
 
 func Test_connectAndLogin(t *testing.T) {
 	ctx := context.Background()
-	usersFile := os.Getenv("PWD") + "/" + "passwd"
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Error(err)
+	}
+	usersFile := wd + "/" + "passwd"
+	t.Logf("usersFile is %s", usersFile)
+	// convert path for Windows
+	if strings.HasPrefix(usersFile, "C:\\") {
+		oldFile := strings.Replace(usersFile, "C:\\", "/c/", 1)
+		usersFile = oldFile
+		usersFile = strings.Replace(usersFile, "\\", "/", -1)
+		t.Logf("changed usersFile from %s to %s", oldFile, usersFile)
+	}
 	req := testcontainers.ContainerRequest{
 		Image: "docker.io/modularitycontainers/dovecot",
 		ExposedPorts: []string{"10143/tcp"},
