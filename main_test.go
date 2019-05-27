@@ -8,23 +8,27 @@ import (
 
 	testcontainers "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"github.com/docker/go-connections/nat"
 )
 
-func Test_connectAndLogin(t *testing.T) {
-	ctx := context.Background()
+const (
+	imapPort = "10143"
+	imapUser = "testuser"
+	imapPass = "testing.one.two.three"
+)
+
+func startImapContainer(ctx context.Context) (testcontainers.Container, error) {
 
 	wd, err := os.Getwd()
 	if err != nil {
-		t.Error(err)
+		return nil, err
 	}
 	usersFile := wd + "/" + "passwd"
-	t.Logf("usersFile is %s", usersFile)
 	// convert path for Windows
 	if strings.HasPrefix(usersFile, "C:\\") {
 		oldFile := strings.Replace(usersFile, "C:\\", "/c/", 1)
 		usersFile = oldFile
 		usersFile = strings.Replace(usersFile, "\\", "/", -1)
-		t.Logf("changed usersFile from %s to %s", oldFile, usersFile)
 	}
 	req := testcontainers.ContainerRequest{
 		Image: "docker.io/modularitycontainers/dovecot",
@@ -44,24 +48,67 @@ func Test_connectAndLogin(t *testing.T) {
 		Started: true,
 	})
 	if err != nil {
+		return container, err
+	}
+
+	return container, nil
+}
+
+func getIpAndPort(ctx context.Context, container testcontainers.Container) (ip string, port nat.Port, err error) {
+	ip, err = container.Host(ctx)
+	if err != nil {
+		return
+	}
+
+	port, err = container.MappedPort(ctx, imapPort)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+
+func Test_connectAndLogin(t *testing.T) {
+	ctx := context.Background()
+	container, err := startImapContainer(ctx)
+	if err != nil {
 		t.Error(err)
 	}
 	defer container.Terminate(ctx)
 
-	ip, err := container.Host(ctx)
+	ip, port, err := getIpAndPort(ctx, container)
 	if err != nil {
 		t.Error(err)
 	}
 
-	port, err := container.MappedPort(ctx, "10143")
+	_, err = connectAndLogin(ip, port.Port(), imapUser, imapPass, false)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func Test_purgeFolder(t *testing.T) {
+	ctx := context.Background()
+	container, err := startImapContainer(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+	defer container.Terminate(ctx)
+
+	ip, port, err := getIpAndPort(ctx, container)
 	if err != nil {
 		t.Error(err)
 	}
 
-	_, err = connectAndLogin(ip, port.Port(), "testuser", "testing.one.two.three", false)
+	c, err := connectAndLogin(ip, port.Port(), imapUser, imapPass, false)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = purgeFolder(c, "INBOX", 10, 1)
 	if err != nil {
 		t.Error(err)
 	}
 
 }
-

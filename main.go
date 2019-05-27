@@ -119,9 +119,97 @@ func connectAndLogin(imapServer string, imapPort string, imapUser string, imapPa
 	return c, err
 }
 
+func purgeFolder(c *client.Client, folder string, age int64, batch int) error {
+	mbox, err := c.Select(folder, false)
+	if err != nil {
+		return err
+	}
+	logrus.Infof("Flags for %s: %v", folder, mbox.Flags)
+	logrus.Infof("Unread: %d, Total: %d", mbox.Unseen, mbox.Messages)
+
+	lastset := new(imap.SeqSet)
+	lastset.AddNum(1)
+	messages := make(chan *imap.Message, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- c.Fetch(lastset, []imap.FetchItem{imap.FetchEnvelope}, messages)
+	}()
+	if err := <-done; err != nil {
+		return err
+	}
+	if msg := <-messages; msg != nil {
+		logrus.Infof("Oldest message: %v %v", msg.Envelope.Date, msg.Envelope.Subject)
+	}
+
+	t := time.Now()
+	var day int64
+	day = 60*60*24
+	beforeTime := t.Unix() - (day*age)
+	before := time.Unix(beforeTime, 0)
+	searchCrit := new(imap.SearchCriteria)
+	searchCrit.Before = before
+	seqNums, err := c.Search(searchCrit)
+	if err != nil {
+		return err
+	}
+	logrus.Debugf("%v", seqNums)
+	for num, _ := range seqNums {
+		logrus.Debugf("seqnum: %v", num)
+	}
+
+	seqset := new(imap.SeqSet)
+	seqLen := len(seqNums)
+	start := 0
+	end := start + batch
+	if seqLen < batch {
+		end = seqLen
+	}
+	ct := 1
+	for start < seqLen {
+		logrus.Infof("batch %v is %v", ct, seqNums[start:end])
+		seqset.Clear()
+		seqset.AddNum(seqNums[start:end]...)
+
+		ct++
+		start = end
+		end = start + batch
+		if end > seqLen {
+			end = seqLen
+		}
+		messages = make(chan *imap.Message, end-start)
+		done = make(chan error, 1)
+		go func() {
+			done <- c.Fetch(seqset, []imap.FetchItem{imap.FetchEnvelope}, messages)
+		}()
+
+		for msg := range messages {
+			logrus.Infof("* %v %v", msg.Envelope.Date, msg.Envelope.Subject)
+		}
+
+		if err := <-done; err != nil {
+			return err
+		}
+		logrus.Infof("batch %v is done", ct)
+
+		item := imap.FormatFlagsOp(imap.AddFlags, true)
+		flags := []interface{}{imap.DeletedFlag}
+		if err := c.Store(seqset, item, flags, nil); err != nil {
+			return err
+		}
+
+		if err := c.Expunge(nil); err != nil {
+			return err
+		}
+
+		sleeptime := 30 * 1000 * time.Millisecond
+		logrus.Infof("sleep %d seconds", sleeptime / 1000*time.Millisecond)
+		time.Sleep(sleeptime)
+	}
+	logrus.Infof("Done with %s", folder)
+	return err
+}
+
 func purgeFolders(ctx *cli.Context) error {
-	var done chan error
-	var messages chan *imap.Message
 
 	msgAge := ctx.Int64("age")
 	batch := ctx.Int("batch")
@@ -146,93 +234,10 @@ func purgeFolders(ctx *cli.Context) error {
 	defer c.Logout()
 
 	for _, folder := range folders {
-		mbox, err := c.Select(folder, false)
+		err = purgeFolder(c, folder, msgAge, batch)
 		if err != nil {
 			logrus.Fatal(err)
 		}
-		logrus.Infof("Flags for %s: %v", folder, mbox.Flags)
-		logrus.Infof("Unread: %d, Total: %d", mbox.Unseen, mbox.Messages)
-
-		lastset := new(imap.SeqSet)
-		//lastset.AddNum(mbox.Messages)
-		lastset.AddNum(1)
-		messages = make(chan *imap.Message, 1)
-		done = make(chan error, 1)
-		go func() {
-			done <- c.Fetch(lastset, []imap.FetchItem{imap.FetchEnvelope}, messages)
-		}()
-		if err := <-done; err != nil {
-			logrus.Fatal(err)
-		}
-		if msg := <-messages; msg != nil {
-			logrus.Infof("Oldest message: %v %v", msg.Envelope.Date, msg.Envelope.Subject)
-		}
-
-		t := time.Now()
-		var day int64
-		day = 60*60*24
-		beforeTime := t.Unix() - (day*msgAge)
-		before := time.Unix(beforeTime, 0)
-		searchCrit := new(imap.SearchCriteria)
-		searchCrit.Before = before
-		seqNums, err := c.Search(searchCrit)
-		if err != nil {
-			logrus.Fatal(err)
-		}
-		logrus.Debugf("%v", seqNums)
-		for num, _ := range seqNums {
-			logrus.Debugf("seqnum: %v", num)
-		}
-
-		seqset := new(imap.SeqSet)
-		seqLen := len(seqNums)
-		start := 0
-		end := start + batch
-		if seqLen < batch {
-			end = seqLen
-		}
-		ct := 1
-		for start < seqLen {
-			logrus.Infof("batch %v is %v", ct, seqNums[start:end])
-			seqset.Clear()
-			seqset.AddNum(seqNums[start:end]...)
-
-			ct++
-			start = end
-			end = start + batch
-			if end > seqLen {
-				end = seqLen
-			}
-			messages = make(chan *imap.Message, end-start)
-			done = make(chan error, 1)
-			go func() {
-				done <- c.Fetch(seqset, []imap.FetchItem{imap.FetchEnvelope}, messages)
-			}()
-
-			for msg := range messages {
-				logrus.Infof("* %v %v", msg.Envelope.Date, msg.Envelope.Subject)
-			}
-
-			if err := <-done; err != nil {
-				logrus.Fatal(err)
-			}
-			logrus.Infof("batch %v is done", ct)
-
-			item := imap.FormatFlagsOp(imap.AddFlags, true)
-			flags := []interface{}{imap.DeletedFlag}
-			if err := c.Store(seqset, item, flags, nil); err != nil {
-				logrus.Fatal(err)
-			}
-
-			if err := c.Expunge(nil); err != nil {
-				logrus.Fatal(err)
-			}
-
-			sleeptime := 30 * 1000 * time.Millisecond
-			logrus.Infof("sleep %d seconds", sleeptime / 1000*time.Millisecond)
-			time.Sleep(sleeptime)
-		}
-		logrus.Infof("Done with %s", folder)
 	}
 
 	return nil
