@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	imapPort = "10143"
+	imapPort = "143"
+	imapFullPort = "143/tcp"
 	imapUser = "testuser"
 	imapPass = "testing.one.two.three"
 )
@@ -31,8 +32,8 @@ func startImapContainer(ctx context.Context) (testcontainers.Container, error) {
 		usersFile = strings.Replace(usersFile, "\\", "/", -1)
 	}
 	req := testcontainers.ContainerRequest{
-		Image: "docker.io/modularitycontainers/dovecot",
-		ExposedPorts: []string{"10143/tcp"},
+		Image: "mydovecot:2",
+		ExposedPorts: []string{imapFullPort},
 		Env: map[string]string{
 			"DEBUG_MODE": "",
 			"MYHOSTNAME": "localhost",
@@ -41,7 +42,7 @@ func startImapContainer(ctx context.Context) (testcontainers.Container, error) {
 		BindMounts: map[string]string{
 			usersFile: "/etc/dovecot/users",
 		},
-		WaitingFor: wait.NewHostPortStrategy("10143/tcp"),
+		WaitingFor: wait.NewHostPortStrategy(imapFullPort),
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
