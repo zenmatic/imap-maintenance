@@ -11,6 +11,7 @@ import (
 	"github.com/emersion/go-imap"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+        "github.com/urfave/cli/altsrc"
 )
 
 var VERSION = "0.1"
@@ -34,7 +35,7 @@ func mainErr() error {
 	app.Version = VERSION
 	app.Author = ""
 	app.Email = ""
-	app.Flags = []cli.Flag{
+	flags := []cli.Flag{
 		cli.BoolFlag{
 			Name:  "debug, d",
 			Usage: "Debug logging",
@@ -43,24 +44,31 @@ func mainErr() error {
 			Name:  "dry-run, n",
 			Usage: "Dry run mode",
 		},
-		cli.StringFlag{
-			Name:  "server, s",
-			Usage: "imap server",
-		},
-		cli.StringFlag{
+		altsrc.NewStringFlag(cli.StringFlag{
+                        Name:  "server",
+                        Usage: "imap server",
+                }),
+		altsrc.NewStringFlag(cli.StringFlag{
 			Name:  "port, P",
 			Value: "993",
 			Usage: "imap server port",
-		},
-		cli.StringFlag{
-			Name:  "user, u",
+		}),
+		altsrc.NewStringFlag(cli.StringFlag{
+			Name:  "user",
 			Usage: "imap user",
-		},
-		cli.BoolFlag{
-			Name:  "tls",
-			Usage: "connect with TLS",
+		}),
+		altsrc.NewBoolFlag(cli.BoolFlag{
+                        Name:  "tls",
+                        Usage: "connect with TLS",
+                }),
+		cli.StringFlag{
+			Name:  "config",
+			Usage: "load settings from config file `FILE'",
+                        Value: os.Getenv("HOME") + "/.imap-maintenance.yml",
 		},
 	}
+        app.Before = altsrc.InitInputSourceWithContext(flags, altsrc.NewYamlSourceFromFlagFunc("config"))
+        app.Flags = flags
 	app.Commands = []cli.Command{
 		cli.Command{
 			Name:        "purge",
