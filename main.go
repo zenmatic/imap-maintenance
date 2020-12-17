@@ -88,6 +88,11 @@ func mainErr() error {
 					Value: 25,
 					Usage: "purge in batches",
 				},
+				cli.Int64Flag{
+					Name:  "interval, i",
+					Value: 5,
+					Usage: "interval (in seconds) between batches",
+				},
 			},
 		},
 		cli.Command{
@@ -111,6 +116,11 @@ func mainErr() error {
 					Name:  "max, m",
 					Value: 0,
 					Usage: "maximum number of batches to run",
+				},
+				cli.Int64Flag{
+					Name:  "interval, i",
+					Value: 5,
+					Usage: "interval (in seconds) between batches",
 				},
 			},
 		},
@@ -159,6 +169,7 @@ func archiveByYear (ctx *cli.Context) error {
 	msgAge := ctx.Int64("age")
 	batch := ctx.Int("batch")
 	maxBatches := ctx.Int("max")
+        sleepInterval := ctx.Int64("interval")
 	logrus.Debugf("num of args %d", ctx.NArg())
 	if ctx.NArg() < 1 {
 		logrus.Fatal("no folders passed")
@@ -280,8 +291,8 @@ func archiveByYear (ctx *cli.Context) error {
                                 }
                         }
 
-			sleeptime := 30 * 1000 * time.Millisecond
-			logrus.Infof("sleep %d seconds", sleeptime / 1000*time.Millisecond)
+			sleeptime := time.Duration(sleepInterval) * 1000 * time.Millisecond
+			logrus.Infof("sleep %d seconds", sleepInterval)
 			time.Sleep(sleeptime)
 
                         batchct++
@@ -298,6 +309,7 @@ func purgeFolders(ctx *cli.Context) error {
 
 	msgAge := ctx.Int64("age")
 	batch := ctx.Int("batch")
+        sleepInterval := ctx.Int64("interval")
 	logrus.Debugf("num of args %d", ctx.NArg())
 	if ctx.NArg() < 1 {
 		logrus.Fatal("no folders passed")
@@ -401,8 +413,8 @@ func purgeFolders(ctx *cli.Context) error {
 				logrus.Fatal(err)
 			}
 
-			sleeptime := 30 * 1000 * time.Millisecond
-			logrus.Infof("sleep %d seconds", sleeptime / 1000*time.Millisecond)
+			sleeptime := time.Duration(sleepInterval) * 1000 * time.Millisecond
+			logrus.Infof("sleep %d seconds", sleepInterval)
 			time.Sleep(sleeptime)
 		}
 		logrus.Infof("Done with %s", folder)
