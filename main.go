@@ -260,12 +260,17 @@ func archiveByYear (ctx *cli.Context) error {
                                 y := msg.Envelope.Date.Year()
                                 // TODO: verify that year is sane
                                 logrus.Infof("year is %v", y)
+                                if y < 1970 || y > time.Now().Year() {
+                                        logrus.Infof("something is wrong with the year, skipping...", y)
+                                        continue
+                                }
                                 ystr := strconv.Itoa(y)
                                 if _, ok := yearmsgs[ystr]; !ok {
                                         yearmsgs[ystr] = new(imap.SeqSet)
                                 }
                                 yearmsgs[ystr].AddNum(msg.SeqNum)
 			}
+                        logrus.Infof("yearmsgs: %v", yearmsgs)
 
 			if err := <-done; err != nil {
 				logrus.Fatal(err)
