@@ -258,7 +258,6 @@ func archiveByYear (ctx *cli.Context) error {
 			for msg := range messages {
 				logrus.Infof("* %v %v", msg.Envelope.Date, msg.Envelope.Subject)
                                 y := msg.Envelope.Date.Year()
-                                // TODO: verify that year is sane
                                 logrus.Infof("year is %v", y)
                                 if y < 1970 || y > time.Now().Year() {
                                         logrus.Infof("something is wrong with the year, skipping...", y)
