@@ -278,7 +278,13 @@ func archiveByYear (ctx *cli.Context) error {
 
                         for yearbox, yearseq := range yearmsgs {
                                 logrus.Infof("copying %v to %v", yearseq, yearbox)
-                                // TODO: check if mailbox exists, create if not
+                                if _, err = c.Status(yearbox, []imap.StatusItem{imap.StatusUidValidity}); err != nil {
+                                        logrus.Infof("mailbox %s doesn't exist; try to create it", yearbox)
+                                        if err := c.Create(yearbox); err != nil {
+                                                logrus.Fatal(err)
+                                        }
+                                }
+
                                 if err := c.Copy(yearseq, yearbox); err != nil {
                                         logrus.Fatal(err)
                                 }
