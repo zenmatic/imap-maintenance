@@ -6,7 +6,7 @@ require (
 	github.com/emersion/go-imap v1.0.6
 	github.com/sirupsen/logrus v1.5.0
 	github.com/urfave/cli v1.22.5
-	golang.org/x/crypto v0.0.0-20220518034528-6f7dac969898
+	golang.org/x/crypto v0.31.0
 )
 
 require (
@@ -16,8 +16,8 @@ require (
 	github.com/konsorten/go-windows-terminal-sequences v1.0.1 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
-	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1 // indirect
-	golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1 // indirect
-	golang.org/x/text v0.3.6 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/term v0.27.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	gopkg.in/yaml.v2 v2.2.4 // indirect
 )
