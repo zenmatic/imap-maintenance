@@ -1,10 +1,10 @@
 module github.com/zenmatic/imap-maintenance
 
-go 1.18
+go 1.23.0
 
 require (
 	github.com/emersion/go-imap v1.0.6
-	github.com/sirupsen/logrus v1.5.0
+	github.com/sirupsen/logrus v1.8.3
 	github.com/urfave/cli v1.22.5
 	golang.org/x/crypto v0.35.0
 )
@@ -13,7 +13,6 @@ require (
 	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
 	github.com/emersion/go-sasl v0.0.0-20191210011802-430746ea8b9b // indirect
-	github.com/konsorten/go-windows-terminal-sequences v1.0.1 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
